@@ -1,5 +1,7 @@
 package es.chiteroman.playintegrityfix;
 
+import android.util.Log;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -15,7 +17,7 @@ import java.util.Enumeration;
 import java.util.Locale;
 
 public final class CustomKeyStoreSpi extends KeyStoreSpi {
-    public static volatile KeyStoreSpi keyStoreSpi;
+    public static volatile KeyStoreSpi keyStoreSpi = null;
 
     @Override
     public Key engineGetKey(String alias, char[] password) throws NoSuchAlgorithmException, UnrecoverableKeyException {
@@ -24,9 +26,9 @@ public final class CustomKeyStoreSpi extends KeyStoreSpi {
 
     @Override
     public Certificate[] engineGetCertificateChain(String alias) {
-        for (StackTraceElement e : Thread.currentThread().getStackTrace()) {
-            if (e.getClassName().toLowerCase(Locale.ROOT).contains("droidguard")) {
-                EntryPoint.LOG("DroidGuard detected!");
+        for (StackTraceElement stackTraceElement : Thread.currentThread().getStackTrace()) {
+            if (stackTraceElement.getClassName().toLowerCase(Locale.US).contains("droidguard")) {
+                Log.w(EntryPoint.TAG, "DroidGuard invoke engineGetCertificateChain! Throwing exception...");
                 throw new UnsupportedOperationException();
             }
         }

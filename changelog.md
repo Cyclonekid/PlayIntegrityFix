@@ -1,7 +1,13 @@
-We have a Telegram channel!
-If you want to share your knowledge join:
+Telegram channel:
 https://t.me/playintegrityfix
 
-# v13.9
+Device verdict should pass by default.
+If not, try removing /data/adb/pif.json file.
 
-Google banned v13.8 fingerprint.
+Donations:
+https://www.paypal.com/paypalme/chiteroman
+
+# v16.6
+
+- Change fingerprint to fix RCS
+- Misc improvements

@@ -10,6 +10,4 @@ add_library(${CMAKE_PROJECT_NAME} SHARED main.cpp)
 
 add_subdirectory(Dobby)
 
-SET_OPTION(Plugin.Android.BionicLinkerUtil ON)
-
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE log dobby_static)

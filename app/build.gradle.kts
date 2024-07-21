@@ -4,42 +4,44 @@ plugins {
 
 android {
     namespace = "es.chiteroman.playintegrityfix"
-    compileSdk = 34
-    ndkVersion = "26.1.10909125"
+    compileSdk = 35
+    ndkVersion = "27.0.12077973"
     buildToolsVersion = "34.0.0"
 
     buildFeatures {
         prefab = true
     }
 
-    packaging {
-        jniLibs {
-            excludes += "**/libdobby.so"
-        }
-    }
-
     defaultConfig {
         applicationId = "es.chiteroman.playintegrityfix"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        targetSdk = 35
+        versionCode = 16600
+        versionName = "v16.6"
+        multiDexEnabled = false
+
+        packaging {
+            resources {
+                excludes += "**"
+            }
+            jniLibs {
+                excludes += "**/libdobby.so"
+            }
+        }
 
         externalNativeBuild {
             cmake {
-                arguments += "-DANDROID_STL=none"
-                arguments += "-DCMAKE_BUILD_TYPE=MinSizeRel"
-
-                cFlags += "-fvisibility=hidden"
-                cFlags += "-fvisibility-inlines-hidden"
-                cFlags += "-flto"
-
-                cppFlags += "-std=c++20"
-                cppFlags += "-fno-exceptions"
-                cppFlags += "-fno-rtti"
-                cppFlags += "-fvisibility=hidden"
-                cppFlags += "-fvisibility-inlines-hidden"
-                cppFlags += "-flto"
+                arguments += arrayOf(
+                    "-DANDROID_STL=none",
+                    "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON",
+                    "-DANDROID_CPP_FEATURES=no-rtti no-exceptions",
+                    "-DCMAKE_BUILD_TYPE=MinSizeRel",
+                    "-DCMAKE_CXX_STANDARD=23",
+                    "-DCMAKE_C_STANDARD=23",
+                    "-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON",
+                    "-DCMAKE_CXX_VISIBILITY_PRESET=hidden",
+                    "-DCMAKE_C_VISIBILITY_PRESET=hidden",
+                )
             }
         }
     }
@@ -48,13 +50,16 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            multiDexEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+            )
         }
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     externalNativeBuild {
@@ -66,30 +71,36 @@ android {
 }
 
 dependencies {
-    implementation("dev.rikka.ndk.thirdparty:cxx:1.2.0")
+    implementation("org.lsposed.libcxx:libcxx:27.0.12077973")
+    implementation("org.lsposed.hiddenapibypass:hiddenapibypass:4.3")
 }
 
-tasks.register("copyFiles") {
+tasks.register("updateModuleProp") {
     doLast {
-        val moduleFolder = project.rootDir.resolve("module")
-        val dexFile = project.buildDir.resolve("intermediates/dex/release/minifyReleaseWithR8/classes.dex")
-        val soDir = project.buildDir.resolve("intermediates/stripped_native_libs/release/out/lib")
+        val versionName = project.android.defaultConfig.versionName
+        val versionCode = project.android.defaultConfig.versionCode
 
-        dexFile.copyTo(moduleFolder.resolve("classes.dex"), overwrite = true)
+        val modulePropFile = project.rootDir.resolve("module/module.prop")
 
-        soDir.walk().filter { it.isFile && it.extension == "so" }.forEach { soFile ->
-            val abiFolder = soFile.parentFile.name
-            val destination = moduleFolder.resolve("zygisk/$abiFolder.so")
-            soFile.copyTo(destination, overwrite = true)
-        }
+        var content = modulePropFile.readText()
+
+        content = content.replace(Regex("version=.*"), "version=$versionName")
+        content = content.replace(Regex("versionCode=.*"), "versionCode=$versionCode")
+
+        modulePropFile.writeText(content)
     }
 }
 
-tasks.register("copyFiles-resetprop") {
+
+tasks.register("copyFiles") {
+    dependsOn("updateModuleProp")
+
     doLast {
-        val moduleFolder = project.rootDir.resolve("module_resetprop")
-        val dexFile = project.buildDir.resolve("intermediates/dex/release/minifyReleaseWithR8/classes.dex")
-        val soDir = project.buildDir.resolve("intermediates/stripped_native_libs/release/out/lib")
+        val moduleFolder = project.rootDir.resolve("module")
+        val dexFile =
+            project.layout.buildDirectory.get().asFile.resolve("intermediates/dex/release/minifyReleaseWithR8/classes.dex")
+        val soDir =
+            project.layout.buildDirectory.get().asFile.resolve("intermediates/stripped_native_libs/release/stripReleaseDebugSymbols/out/lib")
 
         dexFile.copyTo(moduleFolder.resolve("classes.dex"), overwrite = true)
 
@@ -104,21 +115,12 @@ tasks.register("copyFiles-resetprop") {
 tasks.register<Zip>("zip") {
     dependsOn("copyFiles")
 
-    archiveFileName.set("PlayIntegrityFix.zip")
+    archiveFileName.set("PlayIntegrityFix_${project.android.defaultConfig.versionName}.zip")
     destinationDirectory.set(project.rootDir.resolve("out"))
 
     from(project.rootDir.resolve("module"))
 }
 
-tasks.register<Zip>("zip-resetprop") {
-    dependsOn("copyFiles")
-
-    archiveFileName.set("PlayIntegrityFix-resetprop.zip")
-    destinationDirectory.set(project.rootDir.resolve("out"))
-
-    from(project.rootDir.resolve("module_resetprop"))
-}
-
 afterEvaluate {
-    tasks["assembleRelease"].finalizedBy("copyFiles", "zip", "copyFiles-resetprop", "zip-resetprop")
+    tasks["assembleRelease"].finalizedBy("updateModuleProp", "copyFiles", "zip")
 }
